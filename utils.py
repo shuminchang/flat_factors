@@ -3,6 +3,7 @@ from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error, r2_score
 from sklearn.model_selection import cross_validate
+from sklearn.cluster import KMeans
 import streamlit as st
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -151,6 +152,34 @@ def plot_feature_importances(model, features):
     # Display the saved image in Streamlit with specific width
     st.image("feature_importances.png", width=800)  # Adjust width as needed
 
-@st.cache
+@st.cache_data
 def convert_df(df):
     return df.to_csv(index=False).encode('utf-8')
+
+def perform_clustering(data, n_clusters=3):
+    features = data[['rent', 'area', 'distance']]
+    kmeans = KMeans(n_clusters=n_clusters, random_state=42)
+    data['cluster'] = kmeans.fit_predict(features)
+    return data, kmeans
+
+def plot_clusters(data):
+    # Display clusters on a scatter plot
+    st.subheader("Apartment Clusters")
+    plt.figure(figsize=(10, 6))
+    sns.scatterplot(
+        data=data, 
+        x='area', 
+        y='rent', 
+        hue='cluster', 
+        size='score', 
+        sizes=(20, 200),
+        style='city',
+        palette='tab10'
+    )
+    plt.title("Apartment Clusters")
+    # Save the figure to a file
+    plt.savefig("clusters.png", bbox_inches='tight')
+    plt.close()
+
+    # Display the saved image in Streamlit with specific width
+    st.image("clusters.png", width=800)  # Adjust width as needed

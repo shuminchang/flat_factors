@@ -62,6 +62,13 @@ utils.display_metrics(y_test, y_pred)
 
 utils.plot_feature_importances(model, features)
 
+# Add clustering option
+n_clusters = st.sidebar.slider("Number of Clusters", 2, 10, 3, step=1)
+ranked_apartments, kmeans = utils.perform_clustering(ranked_apartments, n_clusters)
+
+# Display clusters on a scatter plot
+utils.plot_clusters(ranked_apartments)
+
 csv = utils.convert_df(ranked_apartments)
 
 st.download_button(
