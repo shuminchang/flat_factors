@@ -48,32 +48,43 @@ ranked_apartments['garbage_bill'] = original_apartments_data['garbage_bill']
 # Create a link column (modify this to fit your actual link structure)
 # ranked_apartments['link'] = ranked_apartments['item'].apply(lambda x: f"[Link](https://your-apartment-website.com/apartment/{x})")
 
-# Display the ranked apartments with the clickable link column
-st.header("Ranked Apartments")
-# Convert DataFrame to markdown format for clickable links
-st.markdown(ranked_apartments[['item', 'rent', 'area', 'distance', 'electric_bill', 'water_bill', 'other_bill', 'garbage_bill', 'city', 'score', 'link']].to_markdown(index=False))
+tab1, tab2, tab3 = st.tabs(["Ranked Apartments", "Model Insights", "Clusters"])
+
+with tab1:
+    # Display the ranked apartments with the clickable link column
+    st.header("Ranked Apartments")
+    # Convert DataFrame to markdown format for clickable links
+    st.markdown(
+        ranked_apartments[
+            [
+                'item', 'rent', 'area', 'distance', 'electric_bill', 'water_bill', 'other_bill', 'garbage_bill', 'city', 'score', 'link'
+            ]
+        ].to_markdown(index=False)
+        )
+    csv = utils.convert_df(ranked_apartments)
+
+    st.download_button(
+        label="Download ranked apartments as CSV",
+        data=csv,
+        file_name='ranked_apartments.csv',
+        mime='text/csv',
+    )
 
 model, cv_results, X_test, y_test, y_pred, features = utils.train_model(scored_apartments)
 
-# Display cross-validation metrics
-utils.display_cv_metrics(cv_results)
-
-utils.display_metrics(y_test, y_pred)
-
-utils.plot_feature_importances(model, features)
+with tab2:
+    st.header("Model Insights")
+    # Display cross-validation metrics
+    utils.display_cv_metrics(cv_results)
+    utils.display_metrics(y_test, y_pred)
+    utils.plot_feature_importances(model, features)
 
 # Add clustering option
 n_clusters = st.sidebar.slider("Number of Clusters", 2, 10, 3, step=1)
 ranked_apartments, kmeans = utils.perform_clustering(ranked_apartments, n_clusters)
 
-# Display clusters on a scatter plot
-utils.plot_clusters(ranked_apartments)
+with tab3:
+    # Display clusters on a scatter plot
+    st.header("Apartment Clusters")
+    utils.plot_clusters(ranked_apartments)
 
-csv = utils.convert_df(ranked_apartments)
-
-st.download_button(
-    label="Download ranked apartments as CSV",
-    data=csv,
-    file_name='ranked_apartments.csv',
-    mime='text/csv',
-)
