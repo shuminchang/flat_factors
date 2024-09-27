@@ -2,7 +2,11 @@ from sklearn.preprocessing import MinMaxScaler
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error, r2_score
+from sklearn.model_selection import cross_validate
 import streamlit as st
+import matplotlib.pyplot as plt
+import seaborn as sns
+
 # Initialize weights for selected features
 INITIALIZE_WEIGHTS = {
     'rent': 0.4,
@@ -72,19 +76,53 @@ def calculate_scores(data, weights):
     )
     return data
 
-def train_model(scored_data):
+def train_model(scored_data, cv_folds=5):
     # Prepare data for the model after scores are calculated
     # features = scored_apartments[['rent', 'area', 'distance', 'electric_bill', 'water_bill', 'other_bill', 'garbage_bill']]
     features = scored_data.loc[:, ~scored_data.columns.isin(['link', 'score'])]
     target = scored_data['score']
 
     X_train, X_test, y_train, y_test = train_test_split(features, target, test_size=0.2, random_state=42)
-    model = RandomForestRegressor(n_estimators=100, random_state=42)
-    model.fit(X_train, y_train)
 
+    model = RandomForestRegressor(n_estimators=100, random_state=42)
+
+    # Perform cross-validation
+    cv_results = cross_validate(
+        model, 
+        X_train, 
+        y_train, 
+        cv=cv_folds, 
+        scoring=['neg_mean_squared_error', 'r2'], 
+        return_train_score=True
+    )
+
+    # Train the model on the full training set
+    model.fit(X_train, y_train)
     # Predict on the testing data
     y_pred = model.predict(X_test)
-    return model, X_test, y_test, y_pred, features
+
+    return model, cv_results, X_test, y_test, y_pred, features
+
+def display_cv_metrics(cv_results):
+    mse_scores = -cv_results['test_neg_mean_squared_error']
+    r2_scores = cv_results['test_r2']
+
+    st.subheader("Cross-Validated Performance Metrics")
+    st.write(f"**Mean Squared Error (MSE):** {mse_scores.mean():.4f} ± {mse_scores.std():.4f}")
+    st.write(f"**R² Score:** {r2_scores.mean():.4f} ± {r2_scores.std():.4f}")
+
+    fig, ax = plt.subplots(1, 2, figsize=(12, 5))
+
+    sns.boxplot(data=mse_scores, ax=ax[0])
+    ax[0].set_title("Cross-Validated MSE")
+    ax[0].set_xlabel("MSE")
+
+    sns.boxplot(data=r2_scores, ax=ax[1])
+    ax[1].set_title("Cross-Validated R²")
+    ax[1].set_xlabel("R²")
+
+    plt.tight_layout()
+    st.pyplot(fig)
 
 def display_metrics(y_test, y_pred):
     # Calculate performance metrics
@@ -93,3 +131,26 @@ def display_metrics(y_test, y_pred):
 
     st.header(f'Mean Squared Error: {mse:.4f}')
     st.header(f'R2 Score: {r2:.4f}')
+
+def plot_feature_importances(model, features):
+    # Extract and plot feature importances
+    feature_importances = model.feature_importances_
+    st.subheader("Feature Importances")
+
+    # Set figure size and save the figure
+    plt.figure(figsize=(8, 4))  # Adjust these values as needed
+    sns.barplot(x=feature_importances, y=features.columns)
+    plt.title("Feature Importances in Random Forest Model")
+    plt.xlabel("Importance")
+    plt.ylabel("Features")
+
+    # Save the figure to a file
+    plt.savefig("feature_importances.png", bbox_inches='tight')
+    plt.close()
+
+    # Display the saved image in Streamlit with specific width
+    st.image("feature_importances.png", width=800)  # Adjust width as needed
+
+@st.cache
+def convert_df(df):
+    return df.to_csv(index=False).encode('utf-8')

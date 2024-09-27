@@ -1,12 +1,10 @@
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns
 import streamlit as st
-import utils
-
 # Set page configuration
 st.set_page_config(layout="wide")
+import utils
+
 
 # Load the apartment data
 apartments_data = pd.read_csv('data/apartment_choice.csv')
@@ -24,7 +22,13 @@ st.sidebar.header("Adjust Weights")
 with st.sidebar:
     for feature in utils.INITIALIZE_WEIGHTS.keys():
         initial_value = utils.INITIALIZE_WEIGHTS[feature]
-        utils.INITIALIZE_WEIGHTS[feature] = st.slider(f"Weight for {feature}", 0.0, 1.0, initial_value, 0.01)
+        utils.INITIALIZE_WEIGHTS[feature] = st.slider(
+            f"Weight for {feature}", 
+            0.0, 
+            1.0, 
+            initial_value, 
+            0.01
+        )
 
 # Calculate scores with adjusted weights
 scored_apartments = utils.calculate_scores(apartments_data.copy(), utils.INITIALIZE_WEIGHTS)
@@ -49,33 +53,16 @@ st.header("Ranked Apartments")
 # Convert DataFrame to markdown format for clickable links
 st.markdown(ranked_apartments[['item', 'rent', 'area', 'distance', 'electric_bill', 'water_bill', 'other_bill', 'garbage_bill', 'city', 'score', 'link']].to_markdown(index=False))
 
-model, X_test, y_test, y_pred, features = utils.train_model(scored_apartments)
+model, cv_results, X_test, y_test, y_pred, features = utils.train_model(scored_apartments)
+
+# Display cross-validation metrics
+utils.display_cv_metrics(cv_results)
 
 utils.display_metrics(y_test, y_pred)
 
-# Extract and plot feature importances
-feature_importances = model.feature_importances_
-st.subheader("Feature Importances")
+utils.plot_feature_importances(model, features)
 
-# Set figure size and save the figure
-plt.figure(figsize=(8, 4))  # Adjust these values as needed
-sns.barplot(x=feature_importances, y=features.columns)
-plt.title("Feature Importances in Random Forest Model")
-plt.xlabel("Importance")
-plt.ylabel("Features")
-
-# Save the figure to a file
-plt.savefig("feature_importances.png", bbox_inches='tight')
-plt.close()
-
-# Display the saved image in Streamlit with specific width
-st.image("feature_importances.png", width=800)  # Adjust width as needed
-
-@st.cache
-def convert_df(df):
-    return df.to_csv(index=False).encode('utf-8')
-
-csv = convert_df(ranked_apartments)
+csv = utils.convert_df(ranked_apartments)
 
 st.download_button(
     label="Download ranked apartments as CSV",
