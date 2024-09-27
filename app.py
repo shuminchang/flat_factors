@@ -48,7 +48,7 @@ ranked_apartments['garbage_bill'] = original_apartments_data['garbage_bill']
 # Create a link column (modify this to fit your actual link structure)
 # ranked_apartments['link'] = ranked_apartments['item'].apply(lambda x: f"[Link](https://your-apartment-website.com/apartment/{x})")
 
-tab1, tab2, tab3 = st.tabs(["Ranked Apartments", "Model Insights", "Clusters"])
+tab1, tab2, tab3, tab4 = st.tabs(["Ranked Apartments", "Model Insights", "Clusters", "Model Explain"])
 
 with tab1:
     # Display the ranked apartments with the clickable link column
@@ -61,8 +61,8 @@ with tab1:
             ]
         ].to_markdown(index=False)
         )
+    # Download button
     csv = utils.convert_df(ranked_apartments)
-
     st.download_button(
         label="Download ranked apartments as CSV",
         data=csv,
@@ -88,3 +88,16 @@ with tab3:
     st.header("Apartment Clusters")
     utils.plot_clusters(ranked_apartments)
 
+with tab4:
+    shap_values = utils.get_shap_explainer(model, X_test)
+    utils.plot_shap_summary(shap_values, X_test)
+
+    # Display explanations for top 3 apartments
+    st.subheader("Explanations for Top Apartments")
+    top_apartments = ranked_apartments.head(3).copy()
+    top_apartments = top_apartments.reset_index()
+    for index, apartment in top_apartments.iterrows():
+        shap_value = shap_values[index]
+        features = X_test.iloc[index]
+        explanation = utils.generate_explanation(apartment, shap_value, features)
+        st.markdown(explanation)

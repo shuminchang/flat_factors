@@ -7,7 +7,10 @@ from sklearn.cluster import KMeans
 import streamlit as st
 import matplotlib.pyplot as plt
 import seaborn as sns
+import shap
+import pandas as pd
 
+IMAGE_WIDTH = 1000
 # Initialize weights for selected features
 INITIALIZE_WEIGHTS = {
     'rent': 0.4,
@@ -123,7 +126,12 @@ def display_cv_metrics(cv_results):
     ax[1].set_xlabel("R²")
 
     plt.tight_layout()
-    st.pyplot(fig)
+    # Save the figure to a file
+    plt.savefig("cv_metrics.png", bbox_inches='tight')
+    plt.close()
+
+    # Display the saved image in Streamlit with specific width
+    st.image("cv_metrics.png", width=IMAGE_WIDTH)  # Adjust width as needed
 
 def display_metrics(y_test, y_pred):
     # Calculate performance metrics
@@ -134,13 +142,21 @@ def display_metrics(y_test, y_pred):
     st.header(f'R2 Score: {r2:.4f}')
 
 def plot_feature_importances(model, features):
-    # Extract and plot feature importances
+    # Extract feature importances and create a DataFrame
     feature_importances = model.feature_importances_
+    importance_df = pd.DataFrame({
+        'feature': features.columns,
+        'importance': feature_importances
+    })
+
+    # Sort the DataFrame by importance in descending order
+    importance_df = importance_df.sort_values(by='importance', ascending=False)
+
     st.subheader("Feature Importances")
 
     # Set figure size and save the figure
     plt.figure(figsize=(8, 4))  # Adjust these values as needed
-    sns.barplot(x=feature_importances, y=features.columns)
+    sns.barplot(x=importance_df['importance'], y=importance_df['feature'])
     plt.title("Feature Importances in Random Forest Model")
     plt.xlabel("Importance")
     plt.ylabel("Features")
@@ -150,7 +166,7 @@ def plot_feature_importances(model, features):
     plt.close()
 
     # Display the saved image in Streamlit with specific width
-    st.image("feature_importances.png", width=800)  # Adjust width as needed
+    st.image("feature_importances.png", width=IMAGE_WIDTH)  # Adjust width as needed
 
 @st.cache_data
 def convert_df(df):
@@ -182,4 +198,63 @@ def plot_clusters(data):
     plt.close()
 
     # Display the saved image in Streamlit with specific width
-    st.image("clusters.png", width=800)  # Adjust width as needed
+    st.image("clusters.png", width=IMAGE_WIDTH)  # Adjust width as needed
+
+def get_shap_explainer(model, X):
+    """Create a SHAP explainer for the model."""
+    explainer = shap.Explainer(model, X)
+    shap_values = explainer(X)
+    return shap_values
+
+def plot_shap_summary(shap_values, features):
+    """Plot SHAP summary plot."""
+    st.subheader("SHAP Summary Plot")
+    plt.figure(figsize=(10, 6))
+    shap.summary_plot(shap_values, features, plot_type="bar", show=False)
+    plt.tight_layout()
+    plt.savefig("shap_bar.png", bbox_inches='tight')
+    plt.close()
+
+    # Display the saved image in Streamlit with specific width
+    st.image("shap_bar.png", width=IMAGE_WIDTH)  # Adjust width as needed
+    
+    plt.figure(figsize=(10, 6))
+    shap.summary_plot(shap_values, features, show=False)
+    plt.tight_layout()
+    # Save the figure to a file
+    plt.savefig("shap_summary.png", bbox_inches='tight')
+    plt.close()
+
+    # Display the saved image in Streamlit with specific width
+    st.image("shap_summary.png", width=IMAGE_WIDTH)  # Adjust width as needed
+
+def generate_explanation(apartment, shap_values, features):
+    """
+    Generate a detailed explanation for an apartment based on SHAP values.
+    
+    Parameters:
+    - apartment (Series): The apartment data.
+    - shap_values (shap.Explanation): SHAP values for the apartment.
+    - features (Series): Feature values for the apartment.
+    
+    Returns:
+    - explanation (str): A formatted explanation string.
+    """
+    explanation = f"### Explanation for {apartment['link']}\n\n"
+    explanation += f"**Overall Score:** {apartment['score']:.4f}\n\n"
+    explanation += "**Feature Contributions:**\n\n"
+    
+    # Get top contributing features
+    shap_df = pd.DataFrame({
+        'Feature': features.index,
+        'SHAP Value': shap_values.values
+    }).sort_values(by='SHAP Value', key=lambda x: x.abs(), ascending=False)
+    
+    for _, row in shap_df.iterrows():
+        feature = row['Feature']
+        shap_val = row['SHAP Value']
+        feature_val = features[feature]
+        direction = "increases" if shap_val > 0 else "decreases"
+        explanation += f"- **{feature}**: {direction} the score by {abs(shap_val):.4f} (Value: {feature_val})\n"
+    
+    return explanation
